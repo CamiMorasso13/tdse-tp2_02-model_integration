@@ -5,6 +5,7 @@ Para cada tarea se mide el tiempo de ejecución real en microsegundos usando el 
 Ese tiempo se acumula en g_app_runtime_us.
 Al terminar el ciclo, g_app_runtime_us contiene el tiempo total de CPU consumido por todas las tareas en esa iteración.
 En el siguiente ciclo de app_update(), el proceso se repite: se reinicia y vuelve a calcularse.
+Comienza en Value = 0 y termina en Value = 13. Al presionar el botón baja a Value = 12 y al soltarlo sube a 13. 
 
 Evolucion WCET
 
@@ -12,3 +13,8 @@ El WCET de cada tarea se pone en cero.
 Cada vez que se ejecuta una tarea, se mide cuánto tardó en ese ciclo utilizando cycle_counter_time_us.
 Si ese tiempo supera al WCET guardado, se actualiza y si es menor o igual, el WCET no cambia.
 Cada WCET (de task_tda_list[x]) comienza en 0.
+- WCET del [0] cambia a 5
+- WCET del [1] cambia a 4
+- WCET del [2] cambia a 4
+Luego, al presionar el botón cambian a 7, 6, 5, respectivamente
+
