@@ -1,11 +1,83 @@
 Analisis y Descripcion de los codigos fuentes TP2_02:
 
 task_sensor.c
+ Macros y constantes:
+ 
+ 1) G_TASK_SEN_CNT_INIT, G_TASK_SEN_TICK_CNT_INI.
+ 
+ 2) Delays para lógica antirrebote (DEL_BTN_XX_MIN, DEL_BTN_XX_MED, DEL_BTN_XX_MAX)
+ 
+ 3) Tamaños configurables (SENSOR_CFG_QTY, SENSOR_DTA_QTY) 
+ 
+ Arreglos de estructuras:
+ 
+ 1) Se define una lista de estructuras task_sensor_cfg_list[] tal que cada estructura será
+ representativa de cada entrada (botón) que podramos tener a disposición en un futuro.
+ Cada elemento de esos structs serán relativos a lo que hace cada una de esas entradas (Señales,
+ eventos, pines, etc).
+ 
+ 2) task_sensor_dta_list[] define el estado inicial de cada boton.
+ 
+ Variables globales
+ 
+ 1) g_task_sensor_cnt -> Contador de ejecuciones de la tarea
+ 
+ 2) volatile uint32_t g_task_sensor_tick_cnt -> Señal de tiempo consumida por task_sensor_update
+ 
+ Funciones
+ 
+ 1) task_sensor_init(void*) -> Inicializa contadores y la maquina de estados de cada entrada(en este caso una sola)
+ 
+ 2) task_sensor_update(void*) -> Rutina no bloqueante que administra los ticks pendientes por tareas que se hayan atrasado
+ 
+ 3)task_sensor_statechart(void) -> Recorre toda la lógica de cada una de las posibles maquinas de estados con un switch representativo
+ de cada posible estado que vaya a tomar.
+ 
+ ---------------------------------------------------------------------------------------------------------------------------
+ 
+ task_sensor_attribute.h
+ 
+ Tipos de datos declarados:
+ 
+ 1) task_sensor_ev_t -> Eventos del sensor(EV_BTN_XX_UP, EV_BTN_XX_DOWN)
+ 
+ 2) task_sensor_st_t -> Estados de la máquina de estados (ST_BTN_XX_UP, ST_BTN_XX_FALLING, ST_BTN_XX_DOWN, ST_BTN_XX_RISING)
+ 
+ 3) task_sensor_id_t -> identificador para cada entrada en particular en caso de que hayan varias
+ 
+ Estructuras declaradas:
+ 
+ 1) task_sensor_cfg_t -> Parametros configurables de cada entrada (identificador, pines, eventos a emitir, etc)
+ 
+ 2) task_sensor_dta_t -> Datos por cada entrada (contadores tipo guard, estados y eventos)
 
-task_sensor_attribute.h
-
+ ---------------------------------------------------------------------------------------------------------------------------
+ 
 task_sensor.png
 
+Máquina de estados finita que modela el comportamiento de un botón (sensor), implementada en itemis CREATE.
+
+Estados:
+- ST_BTN_XX_UP -> el botón está suelto (reposo).
+- ST_BTN_XX_DOWN -> el botón está presionado.
+- ST_BTN_XX_RISING -> transición desde presionado hacia suelto (liberación).
+- ST_BTN_XX_FALLING -> transición desde suelto hacia presionado (pulsación).
+
+Eventos:
+- EV_BTN_XX_HOVER -> hover detectado.
+- EV_BTN_XX_PRESSED -> botón presionado.
+Equivalentes a constantes enteras enumeradas (enum) en C.
+
+Acciones:
+tick = DEL_BTN_XX_MAX -> inicializa un temporizador al valor máximo permitido.
+tick-- -> decrementa ese temporizador mientras dure la transición.
+raise EV_SYS_XX_IDLE, raise EV_SYS_XX_ACTIVE -> generan eventos internos para notificar a otras partes del sistema.
+Corresponden con asignaciones a variables y disparos de eventos.
+
+Tipos de datos:
+tick: entero que actúa como contador/temporizador.
+Constantes: DEL_BTN_XX_MAX, DEL_BTN_XX_MIN: límites de tiempo configurados (#define o const uint32_t).
+Eventos: Representados como banderas booleanas o como valores de un enum.
 
 ______________________________________________________________________________________________
 
@@ -16,7 +88,7 @@ Para cada tarea se mide el tiempo de ejecución real en microsegundos usando el 
 Ese tiempo se acumula en g_app_runtime_us.
 Al terminar el ciclo, g_app_runtime_us contiene el tiempo total de CPU consumido por todas las tareas en esa iteración.
 En el siguiente ciclo de app_update(), el proceso se repite: se reinicia y vuelve a calcularse.
-Comienza en Value = 0 y termina en Value = 13. Al presionar el botón baja a Value = 12 y al soltarlo sube a 13. 
+Comienza en Value = 0 y termina en Value = 20. Al presionar el botón baja a Value = 19 y al soltarlo sube a 20. 
 
 Evolucion WCET
 
@@ -24,9 +96,10 @@ El WCET de cada tarea se pone en cero.
 Cada vez que se ejecuta una tarea, se mide cuánto tardó en ese ciclo utilizando cycle_counter_time_us.
 Si ese tiempo supera al WCET guardado, se actualiza y si es menor o igual, el WCET no cambia.
 Cada WCET (de task_tda_list[x]) comienza en 0.
-- WCET del [0] cambia a 5
+- WCET del [0] cambia a 12
 - WCET del [1] cambia a 4
 - WCET del [2] cambia a 4
-Luego, al presionar el botón cambian a 7, 6, 5, respectivamente
+Luego, al presionar el botón cambian a 14, 6, 5, respectivamente.
+
 
 
