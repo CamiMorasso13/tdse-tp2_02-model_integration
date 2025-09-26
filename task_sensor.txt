@@ -1,3 +1,14 @@
+Analisis y Descripcion de los codigos fuentes TP2_02:
+
+task_sensor.c
+
+task_sensor_attribute.h
+
+task_sensor.png
+
+
+______________________________________________________________________________________________
+
 Evolucion de g_app_runtime_us
 
 Al iniciar cada ciclo de actualización de la aplicación, g_app_runtime_us se reinicia. Luego, se ejecutan todas las tareas.
@@ -17,4 +28,5 @@ Cada WCET (de task_tda_list[x]) comienza en 0.
 - WCET del [1] cambia a 4
 - WCET del [2] cambia a 4
 Luego, al presionar el botón cambian a 7, 6, 5, respectivamente
+
 
