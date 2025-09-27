@@ -1,84 +1,77 @@
 Analisis y Descripcion de los codigos fuentes TP2_02:
 
-task_sensor.c
- Macros y constantes:
- 
- 1) G_TASK_SEN_CNT_INIT, G_TASK_SEN_TICK_CNT_INI.
- 
- 2) Delays para lógica antirrebote (DEL_BTN_XX_MIN, DEL_BTN_XX_MED, DEL_BTN_XX_MAX)
- 
- 3) Tamaños configurables (SENSOR_CFG_QTY, SENSOR_DTA_QTY) 
- 
+task_sensor.c:
+Este archivo define una tarea del sistema embebido encargada de leer sensores tipo pulsadores (botones A, B, C, D) y generar eventos al sistema principal.
+
  Arreglos de estructuras:
  
  1) Se define una lista de estructuras task_sensor_cfg_list[] tal que cada estructura será
  representativa de cada entrada (botón) que podramos tener a disposición en un futuro.
  Cada elemento de esos structs serán relativos a lo que hace cada una de esas entradas (Señales,
  eventos, pines, etc).
+  Cada estructura incluye:
+   Identificador del botón (ID_BTN_A, etc.).
+   Puerto y pin del microcontrolador.
+   Nivel lógico de pulsación (BTN_A_PRESSED).
+   Tiempo de retardo máximo (DEL_BTN_XX_MAX).
+   Eventos a generar (signal_up y signal_down).
  
  2) task_sensor_dta_list[] define el estado inicial de cada boton.
- 
+  Cada entrada representa el estado actual de un sensor: {DEL_BTN_XX_MIN, ST_BTN_XX_UP, EV_BTN_XX_UP}
+   Contiene:
+    tick → contador de tiempo para debouncing.
+    state → estado actual (UP, DOWN, FALLING, RISING).
+    event → evento detectado (EV_BTN_XX_UP / DOWN).
+
  Variables globales
- 
- 1) g_task_sensor_cnt -> Contador de ejecuciones de la tarea
- 
- 2) volatile uint32_t g_task_sensor_tick_cnt -> Señal de tiempo consumida por task_sensor_update
- 
- Funciones
- 
- 1) task_sensor_init(void*) -> Inicializa contadores y la maquina de estados de cada entrada(en este caso una sola)
- 
- 2) task_sensor_update(void*) -> Rutina no bloqueante que administra los ticks pendientes por tareas que se hayan atrasado
- 
- 3)task_sensor_statechart(void) -> Recorre toda la lógica de cada una de las posibles maquinas de estados con un switch representativo
- de cada posible estado que vaya a tomar.
- 
- ---------------------------------------------------------------------------------------------------------------------------
- 
- task_sensor_attribute.h
- 
- Tipos de datos declarados:
- 
- 1) task_sensor_ev_t -> Eventos del sensor(EV_BTN_XX_UP, EV_BTN_XX_DOWN)
- 
- 2) task_sensor_st_t -> Estados de la máquina de estados (ST_BTN_XX_UP, ST_BTN_XX_FALLING, ST_BTN_XX_DOWN, ST_BTN_XX_RISING)
- 
- 3) task_sensor_id_t -> identificador para cada entrada en particular en caso de que hayan varias
- 
- Estructuras declaradas:
- 
- 1) task_sensor_cfg_t -> Parametros configurables de cada entrada (identificador, pines, eventos a emitir, etc)
- 
- 2) task_sensor_dta_t -> Datos por cada entrada (contadores tipo guard, estados y eventos)
+   g_task_sensor_cnt -> Contador de ejecuciones de la tarea
+   volatile uint32_t g_task_sensor_tick_cnt -> Señal de tiempo consumida por task_sensor_update
+   task_sensor_dta_list[]	-> arreglo de task_sensor_dta_t	mantiene el estado y temporización de cada sensor
+   task_sensor_cfg_list[]	-> arreglo de task_sensor_cfg_t	define la configuración hardware de cada sensor
 
  ---------------------------------------------------------------------------------------------------------------------------
- 
-task_sensor.png
 
-Máquina de estados finita que modela el comportamiento de un botón (sensor), implementada en itemis CREATE.
-
-Estados:
-- ST_BTN_XX_UP -> el botón está suelto (reposo).
-- ST_BTN_XX_DOWN -> el botón está presionado.
-- ST_BTN_XX_RISING -> transición desde presionado hacia suelto (liberación).
-- ST_BTN_XX_FALLING -> transición desde suelto hacia presionado (pulsación).
-
-Eventos:
-- EV_BTN_XX_HOVER -> hover detectado.
-- EV_BTN_XX_PRESSED -> botón presionado.
-Equivalentes a constantes enteras enumeradas (enum) en C.
-
-Acciones:
-tick = DEL_BTN_XX_MAX -> inicializa un temporizador al valor máximo permitido.
-tick-- -> decrementa ese temporizador mientras dure la transición.
-raise EV_SYS_XX_IDLE, raise EV_SYS_XX_ACTIVE -> generan eventos internos para notificar a otras partes del sistema.
-Corresponden con asignaciones a variables y disparos de eventos.
+task_sensor_attribute.h:
+Define la tabla de estados del sensor tipo botón (Task Sensor).
 
 Tipos de datos:
-tick: entero que actúa como contador/temporizador.
-Constantes: DEL_BTN_XX_MAX, DEL_BTN_XX_MIN: límites de tiempo configurados (#define o const uint32_t).
-Eventos: Representados como banderas booleanas o como valores de un enum.
+ task_sensor_ev_t -> Enumera los eventos que pueden excitar la FSM del sensor. Representa los eventos externos que cambian el estado del sensor.
+ task_sensor_st_t -> Enumera los estados posibles de la FSM. Define la etapa actual del ciclo del botón, gestionando las transiciones con temporización (tick).
+ task_sensor_id_t -> Identifica de manera única cada sensor o botón. Permite referirse a cada botón de forma simbólica, en lugar de por número de pin o puerto.
+ task_sensor_cfg_t -> Estructura de configuración estática de cada botón o sensor.
+ task_sensor_dta_t -> Estructura de datos dinámicos de cada botón. Guarda la información cambiante de cada sensor (estado, temporización y evento actual). Se actualiza en cada ciclo de ejecución de task_sensor(). Es un array de estructuras, donde cada elemento corresponde a un botón físico (A, B, C, D). Permite recorrer todos los sensores dentro de la tarea principal del módulo.
 
+Patrón de diseño:
+Cada sensor mantiene su propio estado (task_sensor_dta_t). La lógica de transición está documentada explícitamente en forma tabular. Las acciones (tick--, put_event_task_system) se ejecutan como efectos secundarios de cada transición. Permite instancias múltiples del mismo autómata (un por botón) sin duplicar código.
+
+ ---------------------------------------------------------------------------------------------------------------------------
+
+task_sensor.png
+ Representa la máquina de estados finita (FSM) que modela el comportamiento dinámico del sensor de botón dentro del sistema embebido. 
+ Cada botón (A, B, C, D) implementa una instancia de esta máquina de estados, la cual gestiona:
+  La detección de presionado y liberado.
+  El control de rebote mediante el contador tick.
+  El envío de eventos al sistema (raise EV_SYS_XX_*) cuando se detectan acciones válidas.
+
+Descripción general del modelo:
+La máquina de estados tiene cuatro estados principales:
+  ST_BTN_XX_UP → Botón en reposo (no presionado).
+  ST_BTN_XX_FALLING → Transición de suelto a presionado (fase de rebote descendente).
+  ST_BTN_XX_DOWN → Botón presionado estable.
+  ST_BTN_XX_RISING → Transición de presionado a suelto (fase de rebote ascendente).
+ El prefijo XX se reemplaza por el identificador del botón (A, B, C, D).
+ El estado inicial (círculo negro) lleva directamente a ST_BTN_XX_UP, indicando que el sistema arranca con todos los botones en reposo.
+
+Descripción de los eventos
+ EV_BTN_XX_PRESSED	-> Señal lógica que indica una presión detectada en el pin del GPIO.	Inicia transición a FALLING o RISING según estado actual.
+ EV_BTN_XX_HOVER	-> Señal periódica de muestreo o mantenimiento.	Permite controlar el rebote mediante tick--.
+ EV_SYS_XX_ACTIVE	-> Evento del sistema indicando botón activado (presionado confirmado).	Notifica a otras tareas o capas del sistema.
+ EV_SYS_XX_IDLE	-> Evento del sistema indicando botón inactivo (liberado confirmado).	Notifica a otras tareas o capas del sistema.
+
+Estructuras:
+task_sensor_cfg_t	-> Define el hardware (pin, puerto, polaridad, delays).
+task_sensor_dta_t	-> Guarda el estado y tick de cada botón.
+task_sensor_ev_t y task_sensor_st_t	-> Tipos enumerados que modelan los eventos y estados del diagrama.
 ______________________________________________________________________________________________
 
 Evolucion de g_app_runtime_us
@@ -100,6 +93,7 @@ Cada WCET (de task_tda_list[x]) comienza en 0.
 - WCET del [1] cambia a 4
 - WCET del [2] cambia a 4
 Luego, al presionar el botón cambian a 14, 6, 5, respectivamente.
+
 
 
 
